@@ -1,0 +1,5 @@
+target: "http://example.com"
+threads: 20
+timeout: 2
+depth: 3
+output: "rabbit_report.html"
