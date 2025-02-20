@@ -1,3 +1,4 @@
 aiohttp
 pyyaml
 beautifulsoup4
+colorama

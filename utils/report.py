@@ -6,7 +6,7 @@ def generate_report(results, output_file):
     for result in results:
         poc = generate_poc(result.get("type", "CVE"), result.get("url", ""), result.get("poc", ""))
         desc = result.get("desc", "Deep vulnerability check")
-        html += f"<tr><td>{result.get(\"type\", \"CVE\")}</td><td>{result.get(\"url\", result.get(\"cve\", \"\"))}</td><td>{poc}</td><td>{desc}</td></tr>"
+        html += f"<tr><td>{result.get(type, CVE)}</td><td>{result.get(url, result.get(cve, ))}</td><td>{poc}</td><td>{desc}</td></tr>"
     html += "</table></body></html>"
     with open(output_file, "w") as f:
         f.write(html)

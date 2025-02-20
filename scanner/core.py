@@ -1,6 +1,6 @@
 import asyncio
 import aiohttp
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 from .plugins.xss import check_xss
 from .plugins.sqli import check_sqli
 from .plugins.ssrf import check_ssrf
@@ -14,17 +14,14 @@ class RabbitVulnScanner:
         self.plugins = [check_xss, check_sqli, check_ssrf]
         self.semaphore = asyncio.Semaphore(config["threads"])
 
-    async def fetch(self, session, url, method="GET", params=None, headers=None):
+    async def fetch(self, session, url, method="GET", params=None):
         async with self.semaphore:
             try:
                 if method == "GET":
-                    async with session.get(url, params=params, headers=headers, timeout=self.config["timeout"]) as resp:
-                        return await resp.text(), resp.status
-                elif method == "POST":
-                    async with session.post(url, data=params, headers=headers, timeout=self.config["timeout"]) as resp:
+                    async with session.get(url, params=params, timeout=self.config["timeout"]) as resp:
                         return await resp.text(), resp.status
             except Exception as e:
-                self.logger.error(f"Fetch error at {url}: {e}")
+                self.logger.error(f"Fetch error at {url}: {str(e)}")
                 return None, None
 
     async def crawl(self, session, url, depth):
@@ -41,7 +38,9 @@ class RabbitVulnScanner:
         return urls
 
     def extract_links(self, html, base_url):
-        from bs4 import BeautifulSoup
+        from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+        import warnings
+        warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
         soup = BeautifulSoup(html, "html.parser")
         base = urlparse(base_url)
         links = set()
@@ -55,14 +54,12 @@ class RabbitVulnScanner:
 
     async def run(self):
         url = self.config["target"]
-        async with aiohttp.ClientSession() as session:
+        proxy = self.config.get("proxy")
+        async with aiohttp.ClientSession(proxy=proxy) as session:
             urls = await self.crawl(session, url, self.config["depth"])
             self.logger.info(f"Crawled {len(urls)} URLs")
             cve_data = await fetch_cve_data(session, self.logger)
-            tasks = []
-            for u in urls:
-                for plugin in self.plugins:
-                    tasks.append(self.run_plugin(session, plugin, u))
+            tasks = [self.run_plugin(session, plugin, u) for u in urls for plugin in self.plugins]
             await asyncio.gather(*tasks)
             for cve in cve_data[:10]:
                 self.results.append({"cve": cve["id"], "desc": cve["description"]})
